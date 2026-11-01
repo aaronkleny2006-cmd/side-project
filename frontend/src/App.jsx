@@ -286,16 +286,21 @@ const displayedMonthlyData = chartExpanded
     1
   );
 
- const currentMonthSpend =
-  monthlyData[new Date().getMonth()]?.total || 0;
 
-  const previousMonthSpend =
-    monthlyData[monthlyData.length - 2]?.total || 0;
+const currentMonthSpend =
+  monthlyData[currentMonthIndex]?.total || 0;
 
-  const monthlyChange = previousMonthSpend === 0
-    ? null
-    : ((currentMonthSpend - previousMonthSpend) /
-        previousMonthSpend) * 100;
+const previousMonthIndex = currentMonthIndex - 1;
+
+const previousMonthSpend =
+  previousMonthIndex >= 0
+    ? monthlyData[previousMonthIndex]?.total || 0
+    : 0;
+
+const monthlyChange = previousMonthSpend === 0
+  ? null
+  : ((currentMonthSpend - previousMonthSpend) /
+      previousMonthSpend) * 100;
 
   return (
     <div className="app">
