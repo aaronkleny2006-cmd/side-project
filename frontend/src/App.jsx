@@ -287,10 +287,12 @@ const displayedMonthlyData = chartExpanded
   );
 
 
-const currentMonthSpend =
-  monthlyData[currentMonthIndex]?.total || 0;
+const comparisonMonthIndex = currentMonthIndex;
 
-const previousMonthIndex = currentMonthIndex - 1;
+const currentMonthSpend =
+  monthlyData[comparisonMonthIndex]?.total || 0;
+
+const previousMonthIndex = comparisonMonthIndex - 1;
 
 const previousMonthSpend =
   previousMonthIndex >= 0
