@@ -26,12 +26,18 @@ const categoryIcons = {
 
 function App() {
   const [expenses, setExpenses] = useState([]);
+  const [selectedYear, setSelectedYear] = useState(
+  String(new Date().getFullYear())
+);
+  const [chartExpanded, setChartExpanded] = useState(false);
+  const [chartFullscreen, setChartFullscreen] = useState(false);
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('Food');
   const [date, setDate] = useState(
     new Date().toISOString().split('T')[0]
   );
+ 
   const [budget, setBudget] = useState(0);
   const [budgetInput, setBudgetInput] = useState('');
   const [budgetMessage, setBudgetMessage] = useState('');
@@ -165,10 +171,15 @@ useEffect(() => {
     }
   };
 
-  const total = expenses.reduce(
-    (sum, expense) => sum + Number(expense.amount),
-    0
-  );
+  const selectedYearExpenses = expenses.filter(
+  (expense) =>
+    new Date(expense.date).getFullYear() === Number(selectedYear)
+);
+
+const total = selectedYearExpenses.reduce(
+  (sum, expense) => sum + Number(expense.amount),
+  0
+);
 
   const thisMonth = expenses.filter((expense) => {
     const d = new Date(expense.date);
@@ -183,7 +194,7 @@ useEffect(() => {
   );
 
   const filteredExpenses = useMemo(() => {
-    return expenses
+    return selectedYearExpenses
       .filter((expense) =>
         expense.title.toLowerCase().includes(search.toLowerCase())
       )
@@ -202,50 +213,62 @@ useEffect(() => {
         }
         return new Date(b.date) - new Date(a.date);
       });
-  }, [expenses, search, filter, sort]);
+  }, [selectedYearExpenses, search, filter, sort]);
 
-  // Analytics: last six months of spending
-  const monthlyData = useMemo(() => {
-    const now = new Date();
+  
+// Analytics: all 12 months of the selected year
+const monthlyData = useMemo(() => {
+  const year = Number(selectedYear);
 
-    const months = Array.from({ length: 6 }, (_, i) => {
-      const d = new Date(
-        now.getFullYear(),
-        now.getMonth() - 5 + i,
-        1
-      );
+  const months = Array.from({ length: 12 }, (_, i) => ({
+    year,
+    month: i,
+    label: new Date(year, i, 1).toLocaleDateString('en-IN', {
+      month: 'short'
+    }),
+    total: 0
+  }));
 
-      return {
-        year: d.getFullYear(),
-        month: d.getMonth(),
-        label: d.toLocaleDateString('en-IN', {
-          month: 'short'
-        }),
-        total: 0
-      };
-    });
+  selectedYearExpenses.forEach((expense) => {
+    const d = new Date(expense.date);
+    const month = months[d.getMonth()];
 
-    expenses.forEach((expense) => {
-      const d = new Date(expense.date);
-      const month = months.find(
-        (m) =>
-          m.year === d.getFullYear() &&
-          m.month === d.getMonth()
-      );
+    if (month) {
+      month.total += Number(expense.amount) || 0;
+    }
+  });
 
-      if (month) {
-        month.total += Number(expense.amount) || 0;
-      }
-    });
+  return months;
+}, [selectedYear, selectedYearExpenses]);
 
-    return months;
-  }, [expenses]);
+const currentMonthIndex =
+  Number(selectedYear) === new Date().getFullYear()
+    ? new Date().getMonth()
+    : 11;
+const yearlyTotal = monthlyData.reduce(
+  (sum, month) => sum + month.total,
+  0
+);
+
+const averageMonthlySpend = yearlyTotal / 12;
+
+const highestSpendingMonth = monthlyData.reduce(
+  (highest, month) =>
+    month.total > highest.total ? month : highest,
+  monthlyData[0]
+);
+const displayedMonthlyData = chartExpanded
+  ? monthlyData
+  : monthlyData.slice(
+      Math.max(0, currentMonthIndex - 5),
+      currentMonthIndex + 1
+    );
 
   // Analytics: spending grouped by category
   const categoryData = useMemo(() => {
     const totals = {};
 
-    expenses.forEach((expense) => {
+    selectedYearExpenses.forEach((expense) => {
       const name = expense.category || 'Other';
       totals[name] =
         (totals[name] || 0) + Number(expense.amount || 0);
@@ -263,8 +286,8 @@ useEffect(() => {
     1
   );
 
-  const currentMonthSpend =
-    monthlyData[monthlyData.length - 1]?.total || 0;
+ const currentMonthSpend =
+  monthlyData[new Date().getMonth()]?.total || 0;
 
   const previousMonthSpend =
     monthlyData[monthlyData.length - 2]?.total || 0;
@@ -363,17 +386,45 @@ useEffect(() => {
               Your financial activity, at a glance.
             </p>
           </div>
-          <span className="analytics-period">Last 6 months</span>
+          <select
+  className="analytics-period"
+  value={selectedYear}
+  onChange={(e) => setSelectedYear(e.target.value)}
+  aria-label="Select year"
+>
+  {['2023', '2024', '2025', '2026'].map((year) => (
+    <option key={year} value={year}>
+      {year}
+    </option>
+  ))}
+</select>
         </div>
 
         <div className="analytics-grid">
-          <article className="analytics-card monthly-chart-card">
+          <article
+  className={`analytics-card monthly-chart-card ${chartFullscreen ? 'fullscreen-chart' : ''}`}
+>
             <div className="analytics-card-heading">
               <div>
                 <h3>Monthly spending</h3>
                 <p>Track your spending over time</p>
               </div>
-              <span className="analytics-icon">↗</span>
+              <button
+  type="button"
+  className="analytics-icon chart-expand-button"
+  onClick={() => {
+    if (chartFullscreen) {
+      setChartFullscreen(false);
+      setChartExpanded(false);
+    } else {
+      setChartFullscreen(true);
+      setChartExpanded(true);
+    }
+  }}
+  aria-label={chartFullscreen ? 'Exit fullscreen' : 'Expand chart'}
+>
+  {chartFullscreen ? '✕' : '⛶'}
+</button>
             </div>
 
             <div className="chart-total">
@@ -386,7 +437,7 @@ useEffect(() => {
             </div>
 
             <div className="bar-chart">
-              {monthlyData.map((month) => (
+              {displayedMonthlyData.map((month) => (
                 <div className="bar-column" key={`${month.year}-${month.month}`}>
                   <span className="bar-value">
                     {month.total > 0
@@ -416,7 +467,36 @@ useEffect(() => {
                 </div>
               ))}
             </div>
+            
+
+            {chartFullscreen && (
+              <div className="chart-insights">
+                <div className="chart-insight-card">
+                  <span>Total spending</span>
+                  <h3>₹{yearlyTotal.toLocaleString('en-IN')}</h3>
+                  <p>Selected year</p>
+                </div>
+
+                <div className="chart-insight-card">
+                  <span>Highest spending</span>
+                  <h3>{highestSpendingMonth.label}</h3>
+                  <p>
+                    ₹{highestSpendingMonth.total.toLocaleString('en-IN')}
+                  </p>
+                </div>
+
+                <div className="chart-insight-card">
+                  <span>Monthly average</span>
+                  <h3>
+                    ₹{Math.round(averageMonthlySpend).toLocaleString('en-IN')}
+                  </h3>
+                  <p>Across 12 months</p>
+                </div>
+              </div>
+            )}
           </article>
+          
+          
 
           <article className="analytics-card category-chart-card">
             <div className="analytics-card-heading">
