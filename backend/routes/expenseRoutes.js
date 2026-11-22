@@ -1,7 +1,9 @@
 
 const express = require('express');
 const router = express.Router();
+router.use(authMiddleware);
 const Expense = require('../models/Expense');
+const authMiddleware = require('../middleware/authMiddleware');
 
 // GET: View all expenses
 router.get('/', async (req, res) => {
